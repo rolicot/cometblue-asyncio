@@ -4,14 +4,14 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="eurotronic-cometblue",
-    version="1.1.0",
-    author="Johanens Rottler",
-    author_email="johannes@rottler.me",
-    description="Allows you to access Eurotronic GmbH BLE Comet Blue Radiator Controller",
+    name="cometblue-asyncio",
+    version="0.9",
+    author="Pavel Krc",
+    author_email="src@pkrc.net",
+    description=" Python library for interacting with the Eurotronic Comet Blue thermostatic radiator valve based on bleak using asyncio.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/zero-udo/eurotronic-cometblue",
+    url="https://github.com/rolicot/cometblue-asyncio",
     packages=setuptools.find_packages(),
     license='MIT',
     classifiers=[
@@ -20,7 +20,7 @@ setuptools.setup(
         "Operating System :: POSIX :: Linux",
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: Microsoft :: Windows :: Windows 10",
-        "Development Status :: 5 - Production/Stable",
+        "Development Status :: 4 - Beta",
     ],
     install_requires="bleak",
     python_requires='>=3.6',
