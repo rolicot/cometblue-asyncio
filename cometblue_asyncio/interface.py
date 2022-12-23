@@ -6,6 +6,9 @@ from struct import Struct
 from uuid import UUID
 from datetime import datetime, time
 
+from . import logdirect
+log = logdirect.Logger(__name__)
+
 SERVICE = "47e9ee00-47e9-11e4-8939-164230d1df67"
 UNCHANGED_VALUE = 0x80
 UNCHANGED_TEMP = -128
@@ -45,11 +48,6 @@ class uuids:
 
 struct_temps = Struct('<5b2B')
 
-debug = lambda *args, **kwargs: None
-
-def enable_debug(fout=sys.stderr):
-    global debug
-    debug = lambda s, *args, **kwargs: print(s.format(*args, **kwargs), file=fout)
 
 def transform_pin(pin: int):
     """
@@ -180,7 +178,7 @@ def transform_holiday_response(values: bytearray):
         start = datetime(values[3] + 2000, values[2], values[1], values[0])
         end = datetime(values[7] + 2000, values[6], values[5], values[4])
     except ValueError:
-        debug('returned holiday: {}', values)
+        log.debug_('returned holiday:', values)
         return None
 
     temperature = values[8] / 2.

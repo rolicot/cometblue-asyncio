@@ -11,7 +11,9 @@ from bleak import BLEDevice, BleakClient, BleakScanner
 from bleak.exc import BleakError
 
 from . import interface
-from .interface import uuids, UNCHANGED_VALUE, debug
+from .interface import uuids, UNCHANGED_VALUE
+from . import logdirect
+log = logdirect.Logger(__name__)
 
 MAC_REGEX = re.compile('([0-9A-F]{2}:){5}[0-9A-F]{2}')
 UUID_REGEX = re.compile('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
