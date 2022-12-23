@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import platform
 import re
+import platform
+import asyncio
 from datetime import datetime
 from typing import Dict, List, Union
 from uuid import UUID
@@ -15,28 +16,33 @@ from .interface import uuids, UNCHANGED_VALUE
 from . import logdirect
 log = logdirect.Logger(__name__)
 
-MAC_REGEX = re.compile('([0-9A-F]{2}:){5}[0-9A-F]{2}')
+MAC_REGEX = re.compile('(^[0-9A-F]{2}:){5}[0-9A-F]{2}$')
 UUID_REGEX = re.compile('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
 
 class CometBlue:
     """Asynchronous adapter for Eurotronic Comet Blue (and rebranded) bluetooth TRV."""
 
-    device: Union[BLEDevice, str]
-    connected: bool
-    pin: bytearray
-    timeout: int
-    client: BleakClient
+    def __init__(self, device: Union[BLEDevice, str], pin=0, timeout=30):
+        """
+        :param device: Either a discovered BLEDevice or Bluetooth MAC address
+            (or UUID on Darwin). If you want to connect to multiple devices at
+            once, discover them with CometBlue.discover or
+            CometBlue.find_multiple first.
+        :param pin: PIN for the device (0 by manufacturer)
+        :param timeout: discover timeout in seconds if specified as MAC/UUID.
+        """
+        if not isinstance(device, BLEDevice):
+            if platform.system() == "Darwin":
+                if not UUID_REGEX.match(device):
+                    raise ValueError("device must be a valid UUID in the format "
+                            "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX or "
+                            "bleak.BLEDevice.")
+            else:
+                if not MAC_REGEX.match(device):
+                    raise ValueError("device must be a valid Bluetooth Address "
+                            "in the format XX:XX:XX:XX:XX:XX or "
+                            "a bleak.BLEDevice.")
 
-    def __init__(self, device: Union[BLEDevice, str], pin=0, timeout=2):
-        if isinstance(device, str):
-            if bool(MAC_REGEX.match(device)) is False and platform.system() != "Darwin":
-                raise ValueError(
-                    "device must be a valid Bluetooth Address in the format XX:XX:XX:XX:XX:XX or a bleak.BLEDevice."
-                )
-            if bool(UUID_REGEX.match(device)) is False and platform.system() == "Darwin":
-                raise ValueError(
-                    "device must be a valid UUID in the format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX or bleak.BLEDevice."
-                )
         if 0 > pin >= 100000000:
             raise ValueError("pin can only consist of digits. Up to 8 digits allowed.")
 
@@ -52,8 +58,7 @@ class CometBlue:
         :param characteristic: UUID of the characteristic to read
         :return: bytearray containing the read values
         """
-        value = await self.client.read_gatt_char(characteristic)
-        return value
+        return await self.client.read_gatt_char(characteristic)
 
     async def _write_value(self, characteristic: UUID, new_value: bytearray):
         """
@@ -67,22 +72,23 @@ class CometBlue:
 
     async def connect(self):
         """
-        Connects to the device. Increases connection-timeout if connection could not be established up to twice the
-        initial timeout. Max 10 retries.
+        Connects to the device and transmits the PIN (necessary for most
+        operations. Uses timeout unless initalized with already discovered
+        BLEDevice.
 
         :return:
         """
-        timeout = self.timeout
-        tries = 0
-        while not self.connected and tries < 10:
-            try:
-                self.client = BleakClient(self.device)
-                await self.client.connect()
-                await self._write_value(uuids.PIN, self.pin)
-                self.connected = True
-            except BleakError:
-                timeout += 2
-                timeout = min(timeout, 2 * self.timeout)
+        self.client = BleakClient(self.device, timeout=self.timeout)
+
+        await self.client.connect()
+
+        try:
+            await self._write_value(uuids.PIN, self.pin)
+        except:
+            await self.client.disconnect()
+            raise
+
+        self.connected = True
 
     async def disconnect(self):
         """
@@ -134,13 +140,14 @@ class CometBlue:
         result = await self._read_value(uuids.DATETIME)
         return interface.transform_datetime_response(result)
 
-    async def set_datetime(self, date: datetime = datetime.now()):
+    async def set_datetime(self, date=None):
         """
         Sets the date and time of the device - used for schedules
 
         :param date: a datetime object, defaults to now
         """
-        new_value = interface.transform_datetime_request(date)
+        new_value = interface.transform_datetime_request(
+                datetime.now() if date is None else date)
         await self._write_value(uuids.DATETIME, new_value)
 
     async def get_weekday(self, weekday) -> dict:
@@ -228,7 +235,7 @@ class CometBlue:
         await self.disconnect()
 
     @classmethod
-    async def discover(cls, timeout=5) -> List[BLEDevice]:
+    async def discover(cls, timeout=30) -> List[BLEDevice]:
         """
         Discovers available CometBlue devices.
 
@@ -236,8 +243,36 @@ class CometBlue:
         :return: List of CometBlue BLEDevices.
         """
         devices = await BleakScanner.discover(timeout, return_adv=True)
-        cometblue_devices = [
-            d[0] for d in devices.values() if interface.SERVICE in d[1].service_uuids
-        ]
-        return cometblue_devices
+        return [d for d, adv in devices.values() 
+                if interface.SERVICE in adv.service_uuids]
+
+    @classmethod
+    async def find_multiple(cls, addresses, timeout=30) -> List[BLEDevice]:
+        """
+        Finds multiple requested CometBlue devices by their addresses.
+
+        :param addresses: List of requested addresses.
+        :param timeout: Duration of Bluetooth scan.
+        :return: List of CometBlue BLEDevices.
+        """
+        found_devs = [None] * len(addresses)
+        idx = {a.upper(): i for i, a in enumerate(addresses)}
+        stop_event = asyncio.Event()
+
+        def callback(device, advertising_data):
+            try:
+                found_devs[idx.pop(device.address.upper())] = device
+            except KeyError:
+                return
+            if not idx:
+                stop_event.set()
+
+        try:
+            async with BleakScanner(callback) as scanner:
+                await asyncio.wait_for(stop_event.wait(), timeout)
+        except asyncio.TimeoutError:
+            log.debug_('Some devices were not found:', *idx.keys())
+
+        return found_devs
+
 

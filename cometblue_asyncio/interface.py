@@ -48,6 +48,9 @@ class uuids:
 
 struct_temps = Struct('<5b2B')
 
+class CometBlueResponseValues:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 def transform_pin(pin: int):
     """
@@ -90,7 +93,7 @@ def transform_temperature_response(value: bytearray) -> dict:
     :return: dict containing the values
     """
     v = struct_temps.unpack(value)
-    result = dict(
+    result = CometBlueResponseValues(
         currentTemp       = v[0] / 2.,
         manualTemp        = v[1] / 2.,
         targetTempLow     = v[2] / 2.,
