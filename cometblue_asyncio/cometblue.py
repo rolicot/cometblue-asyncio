@@ -51,26 +51,40 @@ class CometBlue:
         self.timeout = timeout
         self.connected = False
 
-    async def _read_value(self, characteristic: UUID) -> bytearray:
+    async def _read_value(self, characteristic: UUID, timeout=None) -> bytearray:
         """
-        Reads a characteristic and provides the data as a bytearray. Disconnects afterwards.
+        Reads a characteristic and provides the data as a bytearray.
 
         :param characteristic: UUID of the characteristic to read
+        :param timeout: explicit timeout in seconds
         :return: bytearray containing the read values
         """
-        return await self.client.read_gatt_char(characteristic)
+        t = self.timeout if timeout is None else timeout
+        if t <= 0: #no timeout:
+            return await self.client.read_gatt_char(characteristic)
+        else:
+            # Bleak uses interal timeout only on connect, R/W operations need
+            # their own explicit timeout.
+            return await asyncio.wait_for(
+                    self.client.read_gatt_char(characteristic), t)
 
-    async def _write_value(self, characteristic: UUID, new_value: bytearray):
+    async def _write_value(self, characteristic: UUID, new_value: bytearray, timeout=None):
         """
-        Writes a bytearray to the specified characteristic. Disconnects afterwards to apply written changes.
+        Writes a bytearray to the specified characteristic.
 
         :param characteristic: UUID of the characteristic to write
         :param new_value: bytearray containing the new values
+        :param timeout: explicit timeout in seconds
         :return:
         """
-        await self.client.write_gatt_char(characteristic, new_value, response=True)
+        t = self.timeout if timeout is None else timeout
+        if t <= 0: #no timeout:
+            await self.client.write_gatt_char(characteristic, new_value, response=True)
+        else:
+            return await asyncio.wait_for(self.client.write_gatt_char(
+                characteristic, new_value, response=True), t)
 
-    async def connect(self):
+    async def connect(self, timeout=None):
         """
         Connects to the device and transmits the PIN (necessary for most
         operations. Uses timeout unless initalized with already discovered
@@ -78,9 +92,16 @@ class CometBlue:
 
         :return:
         """
+        # this timeout is for discovery if passed MAC, not for connecting
         self.client = BleakClient(self.device, timeout=self.timeout)
 
-        await self.client.connect()
+        # connect() should have its own timeout, but sometimes it does not
+        # work. Here we add an explicit timeout with 10s buffer.
+        t = self.timeout if timeout is None else timeout
+        if t <= 0: #no timeout:
+            await self.client.connect()
+        else:
+            await asyncio.wait_for(self.client.connect(), t+10)
 
         try:
             await self._write_value(uuids.PIN, self.pin)

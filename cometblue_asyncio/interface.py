@@ -71,7 +71,10 @@ def int_to_time(value):
     if value == NO_TIME:
         return None
     h, m = divmod(value, 6)
-    return time(h, m*10)
+    try:
+        return time(h, m*10)
+    except ValueError:
+        return None
 
 def time_to_int(value):
     """
@@ -83,7 +86,7 @@ def time_to_int(value):
     """
     if value is None:
         return NO_TIME
-    return value.hour * 6 + value.minute / 10
+    return value.hour * 6 + value.minute // 10
 
 def transform_temperature_response(value: bytearray) -> dict:
     """
@@ -113,16 +116,15 @@ def transform_temperature_request(manualTemp=None, targetTempLow=None,
     """
     Transforms a temperatures to a bytearray to be transferred to the device.
     """
-    new_value = (
-        UNCHANGED_TEMP,
-        temperature_to_int(manualTemp),
-        temperature_to_int(targetTempLow),
-        temperature_to_int(targetTempHigh),
-        temperature_to_int(tempOffset),
-        UNCHANGED_VALUE,
-        UNCHANGED_VALUE,
-        )
-    return struct_temps.pack(new_value)
+    return struct_temps.pack(
+            UNCHANGED_TEMP,
+            temperature_to_int(manualTemp),
+            temperature_to_int(targetTempLow),
+            temperature_to_int(targetTempHigh),
+            temperature_to_int(tempOffset),
+            UNCHANGED_VALUE,
+            UNCHANGED_VALUE,
+            )
 
 def transform_datetime_response(value: bytearray) -> datetime:
     """
@@ -189,7 +191,7 @@ def transform_holiday_response(values: bytearray):
     return (start, end, temperature)
 
 def transform_holiday_request(start, end, temp) -> bytearray:
-    assert start != end and 29 > temperature >= 8
+    assert start != end and 29 > temp >= 8
     new_value = bytearray(9)
     new_value[0] = start.hour
     new_value[1] = start.day
