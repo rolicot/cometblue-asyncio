@@ -19,8 +19,8 @@ What sets it aside from other Comet Blue libraries?
   request. Some other libs try to e.g. download everything on first/each
   connection, which takes forever.
 
-- (Once refactoring is finished:) Pythonic, no scaffolding code with hidden
-  typos. API expects sane programmers, no babysitting through excess
+- Partially refactored towards being Pythonic with no scaffolding code with
+  hidden typos. API expects sane programmers, no babysitting through excess
   sanitization of unthinkable input combinations.
 
 ## Compatible devices

@@ -1,4 +1,7 @@
-__pycache__/
-.*.sw?
-tags
 *~
+.*.sw?
+__pycache__/
+tags
+dist/
+cometblue_asyncio.egg-info/
+cometblue_asyncio/_version.py

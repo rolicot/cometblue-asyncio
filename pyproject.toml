@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cometblue-asyncio"
+dynamic = ["version"]
+authors = [
+  { name="Pavel Krc", email="src@pkrc.net" },
+]
+description = "Python library for interacting with the Eurotronic Comet Blue thermostatic radiator valve based on bleak using asyncio."
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "bleak",
+]
+classifiers = [
+    "Programming Language :: Python :: 3.7",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Development Status :: 4 - Beta",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/rolicot/cometblue-asyncio"
+
+[tool.setuptools_scm]
+write_to = "cometblue_asyncio/_version.py"
